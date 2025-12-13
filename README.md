@@ -6,12 +6,12 @@ Un agente inteligente de clima desarrollado en Go que utiliza OpenAI GPT para an
 - Recomendaciones prácticas basadas en las condiciones
 - Evaluación de nivel de riesgo (bajo, medio, alto)
 
-## 🚀 Requisitos
+## Requisitos
 
 - API Key de [OpenWeatherMap](https://openweathermap.org/api)
 - API Key de [OpenAI](https://platform.openai.com/)
 
-## 🔧 Configuración
+## Configuración
 
 Configura las siguientes variables de entorno:
 
@@ -23,20 +23,7 @@ export PORT="8080"  # Opcional, por defecto usa 8080
 
 O crea un archivo `.env`
 
-## 🏃 Ejecución
-
-Ejecuta el servidor:
-
-```bash
-go run main.go
-```
-
-Verás el mensaje:
-```
-🤖 Weather Agent corriendo en puerto 8080
-```
-
-## 📡 Uso del API
+## Uso del API
 
 ### Endpoint
 
@@ -61,22 +48,7 @@ O desde tu navegador:
 http://localhost:8080/agent/weather?city=Leon
 ```
 
-### Respuesta
-
-El endpoint retorna un JSON con la siguiente estructura:
-
-```json
-{
-  "city": "Leon",
-  "temp": 28.5,
-  "condition": "cielo despejado",
-  "analysis": "Análisis detallado del clima...",
-  "recommendation": "Recomendación práctica...",
-  "risk_level": "bajo"
-}
-```
-
-## 📸 Ejemplos
+## Ejemplos
 
 ### Consulta para León
 
