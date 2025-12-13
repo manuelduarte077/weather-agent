@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"weather-agent/internal/agent"
 )
@@ -14,7 +15,9 @@ func AgentWeatherHandler(w http.ResponseWriter, r *http.Request) {
 
 	result, err := agent.Run(city)
 	if err != nil {
-		http.Error(w, "Error del agente IA", 500)
+		log.Println("AGENT ERROR:", err.Error())
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

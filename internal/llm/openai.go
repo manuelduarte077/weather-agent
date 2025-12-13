@@ -8,9 +8,22 @@ import (
 	"os"
 )
 
+type OpenAIResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+
+	Error *struct {
+		Message string `json:"message"`
+		Type    string `json:"type"`
+	} `json:"error"`
+}
+
 func Ask(prompt string) (string, error) {
 	payload := map[string]interface{}{
-		"model": "gpt-4o-mini",
+		"model": "gpt-4.1-mini",
 		"messages": []map[string]string{
 			{
 				"role":    "system",
@@ -23,12 +36,19 @@ func Ask(prompt string) (string, error) {
 		},
 	}
 
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest(
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest(
 		"POST",
 		"https://api.openai.com/v1/chat/completions",
 		bytes.NewBuffer(body),
 	)
+	if err != nil {
+		return "", err
+	}
 
 	req.Header.Set("Authorization", "Bearer "+os.Getenv("OPENAI_API_KEY"))
 	req.Header.Set("Content-Type", "application/json")
@@ -39,16 +59,20 @@ func Ask(prompt string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-
-	choices := result["choices"].([]interface{})
-	if len(choices) == 0 {
-		return "", errors.New("sin respuesta del modelo")
+	var result OpenAIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
 	}
 
-	message := choices[0].(map[string]interface{})["message"]
-	content := message.(map[string]interface{})["content"]
+	// Error de OpenAI
+	if result.Error != nil {
+		return "", errors.New(result.Error.Message)
+	}
 
-	return content.(string), nil
+	// Sin respuestas
+	if len(result.Choices) == 0 {
+		return "", errors.New("respuesta vacía del modelo")
+	}
+
+	return result.Choices[0].Message.Content, nil
 }
