@@ -1,7 +1,22 @@
 package main
 
-import "fmt"
+import (
+	"log"
+	"net/http"
+	"os"
+	"weather-agent/internal/api"
+)
 
 func main() {
-	fmt.Println("Hello, World!")
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	http.HandleFunc("/agent/weather", api.AgentWeatherHandler)
+
+	log.Println("🤖 Weather Agent corriendo en puerto", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
+
 }
