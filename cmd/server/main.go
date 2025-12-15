@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	"weather-agent/internal/api"
 	"weather-agent/internal/config"
 	"weather-agent/internal/llm"
+	"weather-agent/internal/logger"
 	"weather-agent/internal/weather"
 )
 
@@ -20,7 +20,7 @@ func main() {
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		logger.Logger.WithError(err).Fatal("Failed to load configuration")
 	}
 
 	// Initialize services with dependency injection
@@ -55,9 +55,9 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		log.Printf("🤖 Weather Agent running on port %s", cfg.Port)
+		logger.Logger.WithField("port", cfg.Port).Info("Weather Agent running")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server failed to start: %v", err)
+			logger.Logger.WithError(err).Fatal("Server failed to start")
 		}
 	}()
 
@@ -66,14 +66,16 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	logger.Logger.Info("Shutting down server...")
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Logger.WithError(err).Fatal("Server forced to shutdown")
 	}
+
+	logger.Logger.Info("Server exited gracefully")
 
 }

@@ -2,11 +2,12 @@ package api
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
+	"weather-agent/internal/logger"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // requestIDKey is the key used to store request ID in context.
@@ -70,28 +71,30 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-// logHTTPRequest logs HTTP request information in a structured format.
+// logHTTPRequest logs HTTP request information using structured logging with logrus.
 func logHTTPRequest(method, path string, statusCode int, duration time.Duration, requestID, remoteAddr string) {
-	// Structured log format: method, path, status, duration, request_id, remote_addr
-	// This format is easy to parse and can be enhanced with a proper logging library later
-	logMsg := "HTTP request"
-	if requestID != "" {
-		logMsg += " [request_id=" + requestID + "]"
+	fields := logrus.Fields{
+		"method":      method,
+		"path":        path,
+		"status_code": statusCode,
+		"status":      http.StatusText(statusCode),
+		"duration_ms": duration.Milliseconds(),
+		"remote_addr": remoteAddr,
 	}
-	logMsg += " " + method + " " + path
-	logMsg += " status=" + http.StatusText(statusCode)
-	logMsg += " duration=" + duration.String()
-	logMsg += " remote=" + remoteAddr
+
+	if requestID != "" {
+		fields["request_id"] = requestID
+	}
 
 	// Log at appropriate level based on status code
 	if statusCode >= 500 {
 		// Error level for server errors
-		log.Printf("[ERROR] %s", logMsg)
+		logger.Logger.WithFields(fields).Error("HTTP request")
 	} else if statusCode >= 400 {
 		// Warning level for client errors
-		log.Printf("[WARN] %s", logMsg)
+		logger.Logger.WithFields(fields).Warn("HTTP request")
 	} else {
 		// Info level for successful requests
-		log.Printf("[INFO] %s", logMsg)
+		logger.Logger.WithFields(fields).Info("HTTP request")
 	}
 }

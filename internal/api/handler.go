@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 	"weather-agent/internal/agent"
+	"weather-agent/internal/logger"
 )
 
 // Handler holds dependencies for HTTP handlers.
@@ -53,7 +53,7 @@ func (h *Handler) AgentWeatherHandler(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.agent.Run(ctx, city)
 	if err != nil {
-		logError(r.Context(), "Failed to process weather request: %v", err)
+		logError(r.Context(), err, "Failed to process weather request")
 		// Don't expose internal error details to client
 		http.Error(w, "Failed to process weather request", http.StatusInternalServerError)
 		return
@@ -62,7 +62,7 @@ func (h *Handler) AgentWeatherHandler(w http.ResponseWriter, r *http.Request) {
 	// Encode JSON to buffer first to avoid writing headers before checking for errors
 	jsonData, err := json.Marshal(result)
 	if err != nil {
-		logError(r.Context(), "Failed to marshal response: %v", err)
+		logError(r.Context(), err, "Failed to marshal response")
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
@@ -74,14 +74,18 @@ func (h *Handler) AgentWeatherHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Write the JSON response
 	if _, err := w.Write(jsonData); err != nil {
-		logError(r.Context(), "Failed to write response: %v", err)
+		logError(r.Context(), err, "Failed to write response")
 		// Headers already written, can't change status code
 		return
 	}
 }
 
-// logError logs an error with request ID for correlation.
-func logError(ctx context.Context, format string, args ...interface{}) {
+// logError logs an error with request ID for correlation using structured logging.
+func logError(ctx context.Context, err error, message string) {
 	requestID := RequestID(ctx)
-	log.Printf("[ERROR] [request_id=%s] "+format, append([]interface{}{requestID}, args...)...)
+	entry := logger.Logger.WithField("request_id", requestID)
+	if err != nil {
+		entry = entry.WithError(err)
+	}
+	entry.Error(message)
 }

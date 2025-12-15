@@ -23,6 +23,7 @@ Configura las siguientes variables de entorno:
 export OPENWEATHER_API_KEY="tu_api_key_de_openweather"
 export OPENAI_API_KEY="tu_api_key_de_openai"
 export PORT="8080"  # Opcional, por defecto usa 8080
+export LOG_LEVEL="info"  # Opcional, por defecto usa info (debug, info, warn, error)
 ```
 
 O crea un archivo `.env`
@@ -121,6 +122,7 @@ El proyecto sigue los principios de Clean Architecture y mejores prácticas de G
 - ✅ Documentación GoDoc en funciones públicas
 - ✅ Configuración centralizada
 - ✅ Uso del paquete oficial de OpenAI ([openai-go](https://github.com/openai/openai-go)) con retries automáticos
+- ✅ Logging estructurado con [logrus](https://github.com/sirupsen/logrus) en formato JSON para producción
 
 ## Ejemplos
 
