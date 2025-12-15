@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 )
 
@@ -28,10 +27,8 @@ type OpenWeatherClient struct {
 }
 
 // NewOpenWeatherClient creates a new OpenWeatherMap client with proper configuration.
+// The apiKey parameter is required and should be provided from config.Load().
 func NewOpenWeatherClient(apiKey string) *OpenWeatherClient {
-	if apiKey == "" {
-		apiKey = os.Getenv("OPENWEATHER_API_KEY")
-	}
 	return &OpenWeatherClient{
 		apiKey: apiKey,
 		httpClient: &http.Client{
@@ -43,13 +40,10 @@ func NewOpenWeatherClient(apiKey string) *OpenWeatherClient {
 
 // GetWeather retrieves weather information for the specified city.
 // It validates the API key and HTTP response status, returning wrapped errors for better traceability.
+// The city parameter is expected to be validated by the caller.
 func (c *OpenWeatherClient) GetWeather(ctx context.Context, city string) (*WeatherResponse, error) {
 	if c.apiKey == "" {
 		return nil, fmt.Errorf("openweathermap API key is not set")
-	}
-
-	if city == "" {
-		return nil, fmt.Errorf("city parameter cannot be empty")
 	}
 
 	// Sanitize city parameter by URL encoding

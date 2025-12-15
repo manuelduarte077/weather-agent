@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/openai/openai-go/v3"
@@ -23,10 +22,8 @@ type OpenAIClient struct {
 // - Custom HTTP client with 30s timeout for LLM requests
 // - Automatic retries (2 by default) for transient errors
 // - Typed model constant ChatModelGPT4oMini
+// The apiKey parameter is required and should be provided from config.Load().
 func NewOpenAIClient(apiKey string) *OpenAIClient {
-	if apiKey == "" {
-		apiKey = os.Getenv("OPENAI_API_KEY")
-	}
 
 	// Create HTTP client with appropriate timeout for LLM requests
 	httpClient := &http.Client{

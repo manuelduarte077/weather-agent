@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 	"weather-agent/internal/agent"
 )
@@ -41,36 +40,48 @@ func (h *Handler) AgentWeatherHandler(w http.ResponseWriter, r *http.Request) {
 		city = "Managua,NI"
 	}
 
-	// Sanitize and validate city input
-	city = strings.TrimSpace(city)
-	if city == "" {
+	// Validate and sanitize city input
+	city, err := ValidateCity(city, 100)
+	if err != nil {
+		if valErr, ok := err.(*ValidationError); ok {
+			http.Error(w, valErr.Message, valErr.StatusCode)
+			return
+		}
 		http.Error(w, "Invalid city parameter", http.StatusBadRequest)
-		return
-	}
-
-	// Limit city length to prevent abuse
-	if len(city) > 100 {
-		http.Error(w, "City parameter too long", http.StatusBadRequest)
 		return
 	}
 
 	result, err := h.agent.Run(ctx, city)
 	if err != nil {
-		requestID := RequestID(r.Context())
-		log.Printf("[ERROR] [request_id=%s] Failed to process weather request: %v", requestID, err)
-
+		logError(r.Context(), "Failed to process weather request: %v", err)
 		// Don't expose internal error details to client
 		http.Error(w, "Failed to process weather request", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-
-	if err := json.NewEncoder(w).Encode(result); err != nil {
-		requestID := RequestID(r.Context())
-		log.Printf("[ERROR] [request_id=%s] Failed to encode response: %v", requestID, err)
+	// Encode JSON to buffer first to avoid writing headers before checking for errors
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		logError(r.Context(), "Failed to marshal response: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
+
+	// Set headers only after successful encoding
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+
+	// Write the JSON response
+	if _, err := w.Write(jsonData); err != nil {
+		logError(r.Context(), "Failed to write response: %v", err)
+		// Headers already written, can't change status code
+		return
+	}
+}
+
+// logError logs an error with request ID for correlation.
+func logError(ctx context.Context, format string, args ...interface{}) {
+	requestID := RequestID(ctx)
+	log.Printf("[ERROR] [request_id=%s] "+format, append([]interface{}{requestID}, args...)...)
 }

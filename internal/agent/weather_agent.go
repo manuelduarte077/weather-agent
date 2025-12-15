@@ -10,33 +10,26 @@ import (
 
 // WeatherAgent handles weather analysis using weather and LLM services.
 type WeatherAgent struct {
-	weatherService weather.WeatherService
-	llmService     llm.LLMService
+	weatherClient *weather.OpenWeatherClient
+	llmClient     *llm.OpenAIClient
 }
 
-// NewWeatherAgent creates a new WeatherAgent with the provided services.
-func NewWeatherAgent(weatherService weather.WeatherService, llmService llm.LLMService) *WeatherAgent {
+// NewWeatherAgent creates a new WeatherAgent with the provided clients.
+func NewWeatherAgent(weatherClient *weather.OpenWeatherClient, llmClient *llm.OpenAIClient) *WeatherAgent {
 	return &WeatherAgent{
-		weatherService: weatherService,
-		llmService:     llmService,
+		weatherClient: weatherClient,
+		llmClient:     llmClient,
 	}
 }
 
 // Run analyzes the weather for the given city and returns recommendations.
 // It uses the weather service to get current conditions and the LLM service
 // to generate analysis and recommendations.
+// The city parameter is expected to be validated by the caller.
 func (a *WeatherAgent) Run(ctx context.Context, city string) (map[string]interface{}, error) {
-	if city == "" {
-		return nil, fmt.Errorf("city parameter cannot be empty")
-	}
-
-	w, err := a.weatherService.GetWeather(ctx, city)
+	w, err := a.weatherClient.GetWeather(ctx, city)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get weather data: %w", err)
-	}
-
-	if len(w.Weather) == 0 {
-		return nil, fmt.Errorf("weather data incomplete: no weather conditions available")
 	}
 
 	prompt := fmt.Sprintf(`
@@ -62,7 +55,7 @@ func (a *WeatherAgent) Run(ctx context.Context, city string) (map[string]interfa
 		w.Weather[0].Description,
 	)
 
-	response, err := a.llmService.Ask(ctx, prompt)
+	response, err := a.llmClient.Ask(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LLM response: %w", err)
 	}
