@@ -1,78 +1,93 @@
 package llm
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
+	"context"
+	"fmt"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/shared"
 )
 
-type OpenAIResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-
-	Error *struct {
-		Message string `json:"message"`
-		Type    string `json:"type"`
-	} `json:"error"`
+// OpenAIClient implements LLMService using the official OpenAI Go SDK.
+type OpenAIClient struct {
+	client openai.Client
 }
 
-func Ask(prompt string) (string, error) {
-	payload := map[string]interface{}{
-		"model": "gpt-4.1-mini",
-		"messages": []map[string]string{
-			{
-				"role":    "system",
-				"content": "Eres un agente de clima experto en Nicaragua. Responde solo JSON.",
-			},
-			{
-				"role":    "user",
-				"content": prompt,
+// NewOpenAIClient creates a new OpenAI client with proper configuration.
+// It uses the official OpenAI Go SDK which handles retries, timeouts, and error handling automatically.
+// The client is configured with:
+// - Custom HTTP client with 30s timeout for LLM requests
+// - Automatic retries (2 by default) for transient errors
+// - Typed model constant ChatModelGPT4oMini
+func NewOpenAIClient(apiKey string) *OpenAIClient {
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	// Create HTTP client with appropriate timeout for LLM requests
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	// Create client with API key and custom HTTP client
+	// The SDK will use this HTTP client for all requests
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithHTTPClient(httpClient),
+		// Configure retries: 2 retries by default for transient errors
+		// (408 Request Timeout, 409 Conflict, 429 Rate Limit, >=500 Internal errors)
+		option.WithMaxRetries(2),
+	)
+
+	return &OpenAIClient{
+		client: client,
+	}
+}
+
+// Ask sends a prompt to the OpenAI API and returns the response.
+// It uses the official OpenAI SDK which handles HTTP requests, retries, and error handling.
+// The request includes:
+// - System message with instructions
+// - User prompt
+// - Typed model constant ChatModelGPT4oMini
+// - Automatic retries on transient errors
+func (c *OpenAIClient) Ask(ctx context.Context, prompt string) (string, error) {
+	if prompt == "" {
+		return "", fmt.Errorf("prompt cannot be empty")
+	}
+
+	// Create chat completion request using the official SDK
+	// Using typed model constant ChatModelGPT4oMini and helper functions for messages
+	chatCompletion, err := c.client.Chat.Completions.New(
+		ctx,
+		openai.ChatCompletionNewParams{
+			Model: shared.ChatModelGPT4oMini,
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.SystemMessage("Eres un agente de clima experto en Nicaragua. Responde solo JSON."),
+				openai.UserMessage(prompt),
 			},
 		},
-	}
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest(
-		"POST",
-		"https://api.openai.com/v1/chat/completions",
-		bytes.NewBuffer(body),
+		// Optionally configure per-request retries (overrides client default)
+		// option.WithMaxRetries(3),
 	)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to call OpenAI API: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("OPENAI_API_KEY"))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var result OpenAIResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+	// Extract the response content
+	if len(chatCompletion.Choices) == 0 {
+		return "", fmt.Errorf("openai API returned empty response")
 	}
 
-	// Error de OpenAI
-	if result.Error != nil {
-		return "", errors.New(result.Error.Message)
+	// Get the content from the first choice
+	content := chatCompletion.Choices[0].Message.Content
+	if content == "" {
+		return "", fmt.Errorf("openai API returned empty content")
 	}
 
-	// Sin respuestas
-	if len(result.Choices) == 0 {
-		return "", errors.New("respuesta vacía del modelo")
-	}
-
-	return result.Choices[0].Message.Content, nil
+	return content, nil
 }
